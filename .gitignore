@@ -1,0 +1,29 @@
+
+# Playwright
+node_modules/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+/playwright/.auth/
+
+# Dependencies
+node_modules/
+
+# Environment secrets
+.env
+.env.*
+
+# Test artifacts — regenerated each run
+playwright-report/
+test-results/
+results/
+screenshots/
+videos/
+
+# Auth state — contains session cookies
+auth/login-state.json
+
+# OS files
+.DS_Store
+Thumbs.db
