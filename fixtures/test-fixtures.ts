@@ -7,14 +7,8 @@
 // 4. Override — customize built-in page for all tests
 
 import { test as base, Page } from '@playwright/test';
-import {
-    LoginPage,
-    DashboardPage,
-    AccountsPage,
-    TransactionsPage,
-} from '../pages/qaplayground';
+import { LoginPage, DashboardPage, AccountsPage, TransactionsPage } from '../pages/qaplayground';
 import { BANK_VALID_USER } from '../test-data/users';
-
 
 type MyFixtures = {
     page: Page;
@@ -23,7 +17,6 @@ type MyFixtures = {
     accountsPage: AccountsPage;
     transactionsPage: TransactionsPage;
     loggedInPage: {
-    
         dashboardPage: DashboardPage;
         accountsPage: AccountsPage;
         transactionsPage: TransactionsPage;
@@ -34,28 +27,20 @@ type MyFixtures = {
 export const test = base.extend<MyFixtures>({
     // Override built-in page — add popup handler
     page: async ({ page }, use) => {
-        await page.addLocatorHandler(
-            page.getByRole('button', { name: 'Accept' }),
-            async () => {
-                await page.getByRole('button', { name: 'Accept' }).click();
-            },
-        );
+        await page.addLocatorHandler(page.getByRole('button', { name: 'Accept' }), async () => {
+            await page.getByRole('button', { name: 'Accept' }).click();
+        });
         await use(page);
     },
 
     // LoginPage — created + navigated to /bank
     loginPage: async ({ page }, use) => {
-       
         const loginPage = new LoginPage(page);
 
-        
         await loginPage.goTo();
 
-        
         await use(loginPage);
         // PAUSED HERE — test is running
-
-
     },
 
     // DashboardPage — created (no navigation — needs login first)
@@ -76,14 +61,21 @@ export const test = base.extend<MyFixtures>({
         await use(transactionsPage);
     },
 
-    // LoggedInPage — performs login and provides authenticated page objects
+    // LoggedInPage — performs login and provides authenticated page objects.
+    //
+    // WHY log in per-test instead of reusing a saved session?
+    // SecureBank stores its auth token ("currentUser") in sessionStorage.
+    // Playwright's storageState persists only cookies + localStorage, NOT
+    // sessionStorage, so a saved state can't re-authenticate. Logging in here
+    // is the reliable approach. (Login-once via sessionStorage injection is a
+    // documented roadmap optimization for when the suite grows.)
     loggedInPage: async (
         { page, loginPage, dashboardPage, accountsPage, transactionsPage },
         use,
     ) => {
-        // loginPage fixture already navigated to /bank — just login
+        // loginPage fixture already navigated to /bank — just log in
         await loginPage.login(BANK_VALID_USER);
-        // Wait for dashboard element to confirm login success
+        // Wait for a dashboard-only element to confirm login succeeded
         await page.getByTestId('quick-add-account').waitFor({ state: 'visible' });
         await use({ dashboardPage, accountsPage, transactionsPage });
     },

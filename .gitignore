@@ -24,6 +24,16 @@ videos/
 # Auth state — contains session cookies
 auth/login-state.json
 
+# Local tooling / agent config — references local paths, never share
+# (settings.local.json is personal; settings.json is shared project config)
+.claude/settings.local.json
+
+# Editor / IDE local files
+.vscode/
+.idea/
+*.swp
+*.local
+
 # OS files
 .DS_Store
 Thumbs.db

@@ -55,10 +55,7 @@ export class TransactionsPage extends BasePage {
         await this.resetFiltersButton.click();
     }
 
-    async filterTransactions(
-        accountName?: string,
-        transactionType?: string,
-    ): Promise<void> {
+    async filterTransactions(accountName?: string, transactionType?: string): Promise<void> {
         if (accountName) {
             await this.filterByAccount(accountName);
         }

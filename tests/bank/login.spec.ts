@@ -6,7 +6,6 @@ import { test, expect } from '../../fixtures/test-fixtures';
 import { BANK_VALID_USER, BANK_INVALID_USER } from '../../test-data/users';
 
 test.describe('Bank Login', () => {
-
     test('valid login redirects to dashboard @smoke', async ({ loginPage, dashboardPage }) => {
         // ✅ Using fixtures — no manual new LoginPage(page)
         // loginPage already navigated to /bank (fixture did goTo)
@@ -33,7 +32,10 @@ test.describe('Bank Login', () => {
         });
     });
 
-    test('dashboard shows quick actions after login @regression', async ({ loginPage, dashboardPage }) => {
+    test('dashboard shows quick actions after login @regression', async ({
+        loginPage,
+        dashboardPage,
+    }) => {
         await loginPage.login(BANK_VALID_USER);
 
         await expect(dashboardPage.dashboardHeading).toBeVisible();

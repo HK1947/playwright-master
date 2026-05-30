@@ -33,38 +33,27 @@ export default defineConfig({
         ignoreHTTPSErrors: true,
     },
 
+    // NOTE on authentication:
+    // There is intentionally NO `setup` project / `storageState` here.
+    // SecureBank keeps its auth token ("currentUser") in sessionStorage, and
+    // Playwright's storageState only persists cookies + localStorage — never
+    // sessionStorage. A saved storageState therefore cannot re-authenticate,
+    // so tests that need a session log in per-test via the `loggedInPage`
+    // fixture (see fixtures/test-fixtures.ts). For a larger suite this can be
+    // optimized to login-once by capturing/restoring sessionStorage via
+    // page.addInitScript — tracked in the README roadmap.
     projects: [
         {
-            name: 'setup',
-            testDir: './auth',
-            testMatch: /auth\.setup\.ts/,
-            use: {
-            baseURL: process.env.QA_PLAYGROUND_URL,
-                 },
-        },
-        {
             name: 'chromium',
-            use: {
-                ...devices['Desktop Chrome'],
-                storageState: './auth/login-state.json',
-            },
-            dependencies: ['setup'],
+            use: { ...devices['Desktop Chrome'] },
         },
         {
             name: 'firefox',
-            use: {
-                ...devices['Desktop Firefox'],
-                storageState: './auth/login-state.json',
-            },
-            dependencies: ['setup'],
+            use: { ...devices['Desktop Firefox'] },
         },
         {
             name: 'mobile-chrome',
-            use: {
-                ...devices['Pixel 7'],
-                storageState: './auth/login-state.json',
-            },
-            dependencies: ['setup'],
+            use: { ...devices['Pixel 7'] },
         },
     ],
 });

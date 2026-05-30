@@ -25,6 +25,7 @@ Work through it sequentially or jump to the section you need.
 ## Table of Contents
 
 ### Phase 1 — Correctness (Days 1–2)
+
 - [1.1 Add Real Assertions](#11-add-real-assertions-blocker)
 - [1.2 Fix `headless: false`](#12-fix-headless-false-in-ci)
 - [1.3 Remove Hardcoded URLs](#13-remove-hardcoded-urls)
@@ -33,6 +34,7 @@ Work through it sequentially or jump to the section you need.
 - [1.6 Move Credentials to Env](#16-move-credentials-to-env)
 
 ### Phase 2 — Standards Alignment (Days 3–5)
+
 - [2.1 Convert Locators to `readonly` Properties](#21-convert-locators-to-readonly-properties)
 - [2.2 Add Test Tagging](#22-add-test-tagging)
 - [2.3 Multi-Browser Project Matrix](#23-multi-browser-project-matrix)
@@ -42,6 +44,7 @@ Work through it sequentially or jump to the section you need.
 - [2.7 Component / Widget Page Objects](#27-component--widget-page-objects)
 
 ### Phase 3 — Enterprise Capabilities (Week 2)
+
 - [3.1 API Testing Layer](#31-api-testing-layer)
 - [3.2 Test Data Factories (Faker)](#32-test-data-factories-faker)
 - [3.3 Builder Pattern for Test Data](#33-builder-pattern-for-test-data)
@@ -56,6 +59,7 @@ Work through it sequentially or jump to the section you need.
 - [3.12 eslint-plugin-playwright](#312-eslint-plugin-playwright)
 
 ### Phase 4 — CI/CD Excellence (Week 2-3)
+
 - [4.1 Test Sharding](#41-test-sharding)
 - [4.2 Browser Caching in CI](#42-browser-caching-in-ci)
 - [4.3 Matrix Builds (Browser × Env)](#43-matrix-builds-browser--env)
@@ -66,6 +70,7 @@ Work through it sequentially or jump to the section you need.
 - [4.8 Dockerfile](#48-dockerfile)
 
 ### Phase 5 — Governance & Docs (Week 3)
+
 - [5.1 CONTRIBUTING.md](#51-contributingmd)
 - [5.2 ARCHITECTURE.md](#52-architecturemd)
 - [5.3 ADRs (Architecture Decision Records)](#53-adrs-architecture-decision-records)
@@ -73,6 +78,7 @@ Work through it sequentially or jump to the section you need.
 - [5.5 Onboarding Guide](#55-onboarding-guide)
 
 ### Phase 6 — Advanced (Ongoing)
+
 - [6.1 Test Impact Analysis](#61-test-impact-analysis)
 - [6.2 Flaky Test Detection & Quarantine](#62-flaky-test-detection--quarantine)
 - [6.3 Lighthouse Performance Budgets](#63-lighthouse-performance-budgets)
@@ -90,25 +96,29 @@ Work through it sequentially or jump to the section you need.
 ## 1.1 Add Real Assertions (BLOCKER)
 
 ### Problem
+
 Your current `tests/bank/login.spec.ts` uses `console.log` everywhere — these tests **always pass**.
 
 ### Why It Matters
+
 A test suite without assertions gives false confidence. CI shows green; production breaks.
 
 ### Implementation
 
 **Before:**
+
 ```typescript
 test('valid login goes to dashboard', async ({ page }) => {
     const loginPage = new LoginPage(page);
     await loginPage.goTo();
     await loginPage.login(BANK_VALID_USER);
     const heading = await loginPage.getPageHeading();
-    console.log(`Page heading: ${heading}`);   // ❌ Not an assertion
+    console.log(`Page heading: ${heading}`); // ❌ Not an assertion
 });
 ```
 
 **After:**
+
 ```typescript
 import { test, expect } from '../../fixtures/test-fixtures';
 import { BANK_VALID_USER, BANK_INVALID_USER } from '../../test-data/users';
@@ -162,7 +172,7 @@ await expect(locator).toHaveText(/regex/);
 
 // Input value
 await expect(locator).toHaveValue('value');
-await expect(locator).toHaveValues(['a', 'b']);  // multi-select
+await expect(locator).toHaveValues(['a', 'b']); // multi-select
 
 // Attributes & CSS
 await expect(locator).toHaveAttribute('disabled', '');
@@ -182,6 +192,7 @@ await expect(page).toHaveScreenshot('home.png');
 ```
 
 ### Verification
+
 - Run `npx playwright test` — tests should now actually pass/fail based on app behavior
 - Intentionally break the login flow → tests should turn red
 
@@ -190,6 +201,7 @@ await expect(page).toHaveScreenshot('home.png');
 ## 1.2 Fix `headless: false` in CI
 
 ### Problem
+
 `playwright.config.ts:25` has `headless: false` — CI runners have no display server.
 
 ### Implementation
@@ -199,13 +211,14 @@ await expect(page).toHaveScreenshot('home.png');
 export default defineConfig({
     use: {
         // headless: false,  // ❌ Remove
-        headless: !!process.env.CI,  // ✅ Headless in CI, headed locally
+        headless: !!process.env.CI, // ✅ Headless in CI, headed locally
         // OR omit entirely — Playwright defaults to headless
     },
 });
 ```
 
 ### For local debugging:
+
 ```bash
 HEADED=1 npx playwright test
 # or
@@ -217,6 +230,7 @@ npx playwright test --headed
 ## 1.3 Remove Hardcoded URLs
 
 ### Problem
+
 `auth/auth.setup.ts:10` has hardcoded `https://qaplayground.com/bank` — breaks multi-env.
 
 ### Implementation
@@ -226,7 +240,7 @@ npx playwright test --headed
 import { test as setup } from '@playwright/test';
 
 setup('login and save state', async ({ page }) => {
-    await page.goto('/bank');  // ✅ Uses baseURL from config
+    await page.goto('/bank'); // ✅ Uses baseURL from config
 
     await page.getByTestId('username-input').fill(process.env.BANK_USERNAME!);
     await page.getByTestId('password-input').fill(process.env.BANK_PASSWORD!);
@@ -245,6 +259,7 @@ use: {
 ```
 
 ### Multi-env support:
+
 ```bash
 # .env.qa
 QA_PLAYGROUND_URL=https://qaplayground.com
@@ -261,6 +276,7 @@ ENV=staging npx playwright test
 ## 1.4 Add JUnit Reporter
 
 ### Problem
+
 `jenkinsFile:128-131` references `results/junit-results.xml` but no JUnit reporter exists.
 
 ### Implementation
@@ -277,6 +293,7 @@ reporter: [
 ```
 
 ### Verification
+
 ```bash
 npx playwright test
 ls results/junit-results.xml  # Should exist
@@ -287,6 +304,7 @@ ls results/junit-results.xml  # Should exist
 ## 1.5 Fix Fixture Type Drift
 
 ### Problem
+
 `fixtures/test-fixtures.ts:24-29` — type and implementation are out of sync.
 
 ### Implementation
@@ -314,6 +332,7 @@ type MyFixtures = {
 ## 1.6 Move Credentials to Env
 
 ### Problem
+
 `test-data/users.ts:3-7` — `admin/admin123` in source code.
 
 ### Implementation
@@ -358,6 +377,7 @@ BANK_PASSWORD=admin123
 ## 2.1 Convert Locators to `readonly` Properties
 
 ### Problem
+
 Methods returning Locators is non-standard. ~90% of Playwright codebases use `readonly` properties.
 
 ### Implementation Pattern (Hybrid — Best Practice)
@@ -376,8 +396,7 @@ export class LoginPage extends BasePage {
     readonly pageHeading: Locator;
 
     // DYNAMIC locators (need parameters) → readonly arrow function
-    readonly tabByName = (name: string): Locator =>
-        this.page.getByRole('tab', { name });
+    readonly tabByName = (name: string): Locator => this.page.getByRole('tab', { name });
 
     readonly accountRow = (accountName: string): Locator =>
         this.page.getByRole('row', { name: accountName });
@@ -404,6 +423,7 @@ export class LoginPage extends BasePage {
 ```
 
 ### Apply to all 4 page objects:
+
 - `LoginPage.ts`
 - `DashboardPage.ts`
 - `AccountsPage.ts`
@@ -424,18 +444,18 @@ npx playwright test --grep "@p0|@p1"      # priority filter
 
 ### Tagging Strategy
 
-| Tag           | Purpose                          | When Runs                |
-| ------------- | -------------------------------- | ------------------------ |
-| `@smoke`      | Core user journeys (5–10 tests)  | Every PR                 |
-| `@critical`   | Revenue/auth/security paths      | Every PR + production    |
-| `@regression` | Full regression suite            | Nightly                  |
-| `@e2e`        | End-to-end user flows            | Pre-release              |
-| `@api`        | API-only tests                   | API project              |
-| `@visual`     | Screenshot diff tests            | Visual project           |
-| `@a11y`       | Accessibility tests              | Accessibility project    |
-| `@flaky`      | Known-flaky (auto-retry 3x)      | Filtered or quarantined  |
-| `@slow`       | Tests over 30s                   | Excluded from PR runs    |
-| `@p0`/`@p1`/`@p2` | Priority levels              | P0 every commit          |
+| Tag               | Purpose                         | When Runs               |
+| ----------------- | ------------------------------- | ----------------------- |
+| `@smoke`          | Core user journeys (5–10 tests) | Every PR                |
+| `@critical`       | Revenue/auth/security paths     | Every PR + production   |
+| `@regression`     | Full regression suite           | Nightly                 |
+| `@e2e`            | End-to-end user flows           | Pre-release             |
+| `@api`            | API-only tests                  | API project             |
+| `@visual`         | Screenshot diff tests           | Visual project          |
+| `@a11y`           | Accessibility tests             | Accessibility project   |
+| `@flaky`          | Known-flaky (auto-retry 3x)     | Filtered or quarantined |
+| `@slow`           | Tests over 30s                  | Excluded from PR runs   |
+| `@p0`/`@p1`/`@p2` | Priority levels                 | P0 every commit         |
 
 ### Implementation
 
@@ -520,6 +540,7 @@ projects: [
 ```
 
 ### Run specific project:
+
 ```bash
 npx playwright test --project=chromium
 npx playwright test --project=mobile-chrome
@@ -531,6 +552,7 @@ npx playwright test --project=api
 ## 2.4 Standardize Fixture Imports
 
 ### Rule
+
 **Every spec file imports `test` from `fixtures/test-fixtures.ts`, never from `@playwright/test`.**
 
 ### Implementation
@@ -563,6 +585,7 @@ rules: {
 ## 2.5 Use `test.step()` for Reporting
 
 ### Why?
+
 Groups actions into named steps in HTML report — gives non-technical stakeholders a readable test trace.
 
 ### Implementation
@@ -588,6 +611,7 @@ test('transfer funds between accounts @smoke', async ({ loggedInPage }) => {
 ```
 
 ### In HTML report:
+
 ```
 ✓ transfer funds between accounts (3.2s)
   ├─ navigate to transactions (0.8s)
@@ -600,6 +624,7 @@ test('transfer funds between accounts @smoke', async ({ loggedInPage }) => {
 ## 2.6 Add Soft Assertions Where Needed
 
 ### When to Use
+
 Verifying multiple independent properties of the same state — you want to see ALL failures, not stop at first.
 
 ### Implementation
@@ -620,6 +645,7 @@ test('dashboard renders all widgets', async ({ loggedInPage }) => {
 ```
 
 ### Manual control:
+
 ```typescript
 test.fail.expect(test.info().errors.length === 0, 'soft assertions failed');
 ```
@@ -629,6 +655,7 @@ test.fail.expect(test.info().errors.length === 0, 'soft assertions failed');
 ## 2.7 Component / Widget Page Objects
 
 ### Why?
+
 Shared UI components (nav, modal, datagrid) appear on multiple pages. Don't duplicate locators.
 
 ### Implementation
@@ -671,13 +698,14 @@ export class DashboardPage extends BasePage {
 
     constructor(page: Page) {
         super(page);
-        this.navBar = new NavBar(page);  // ✅ Composition
+        this.navBar = new NavBar(page); // ✅ Composition
         this.addAccountButton = page.getByTestId('quick-add-account');
     }
 }
 ```
 
 ### Use in test:
+
 ```typescript
 test('navigate via nav bar', async ({ loggedInPage }) => {
     await loggedInPage.dashboardPage.navBar.goToAccounts();
@@ -693,6 +721,7 @@ test('navigate via nav bar', async ({ loggedInPage }) => {
 ## 3.1 API Testing Layer
 
 ### Why?
+
 - 10x faster than UI tests
 - Tests business logic independent of UI
 - Used for data setup before UI tests
@@ -826,6 +855,7 @@ async create(data: BankAccount): Promise<Account> {
 ## 3.2 Test Data Factories (Faker)
 
 ### Why?
+
 - Random data catches more edge cases
 - No more `Test harsha` accounts polluting your test DB
 - Deterministic with seed
@@ -844,10 +874,7 @@ import { BankAccount } from '../../types';
 export function createBankAccount(overrides?: Partial<BankAccount>): BankAccount {
     return {
         accountName: faker.finance.accountName(),
-        accountType: faker.helpers.arrayElement([
-            'Savings Account',
-            'Current Account',
-        ]),
+        accountType: faker.helpers.arrayElement(['Savings Account', 'Current Account']),
         balance: faker.number.int({ min: 100, max: 10_000 }),
         enableOverdraft: faker.datatype.boolean(),
         ...overrides,
@@ -874,15 +901,17 @@ export function createUserCredentials(overrides?: Partial<BankCredentials>): Ban
 ```
 
 ### Deterministic for snapshot tests
+
 ```typescript
 import { faker } from '@faker-js/faker';
 
 test.beforeEach(() => {
-    faker.seed(123);  // Same data every run
+    faker.seed(123); // Same data every run
 });
 ```
 
 ### Usage in tests
+
 ```typescript
 test('add savings account', async ({ loggedInPage }) => {
     const account = createBankAccount({ accountType: 'Savings Account' });
@@ -898,6 +927,7 @@ test('add savings account', async ({ loggedInPage }) => {
 ## 3.3 Builder Pattern for Test Data
 
 ### Why?
+
 Fluent, readable test data construction with type safety.
 
 ### Implementation
@@ -958,12 +988,9 @@ export class AccountBuilder {
 ```
 
 ### Usage
+
 ```typescript
-const account = new AccountBuilder()
-    .asSavings()
-    .withBalance(5000)
-    .withOverdraft()
-    .build();
+const account = new AccountBuilder().asSavings().withBalance(5000).withOverdraft().build();
 ```
 
 ---
@@ -971,6 +998,7 @@ const account = new AccountBuilder()
 ## 3.4 API-Driven Data Seeding
 
 ### Why?
+
 - UI test setup is slow and flaky
 - Seed via API → fast, deterministic, isolated
 
@@ -991,9 +1019,9 @@ export const test = base.extend<DataFixtures>({
     seededAccount: async ({ accountsApi }, use) => {
         const account = await accountsApi.create(createBankAccount());
 
-        await use(account);  // Test runs
+        await use(account); // Test runs
 
-        await accountsApi.delete(account.id);  // Cleanup
+        await accountsApi.delete(account.id); // Cleanup
     },
 
     seededAccounts: async ({ accountsApi }, use) => {
@@ -1005,12 +1033,13 @@ export const test = base.extend<DataFixtures>({
 
         await use(accounts);
 
-        await Promise.all(accounts.map(a => accountsApi.delete(a.id)));
+        await Promise.all(accounts.map((a) => accountsApi.delete(a.id)));
     },
 });
 ```
 
 ### Usage
+
 ```typescript
 test('view account details', async ({ seededAccount, page }) => {
     // Account already created via API — saves 10s vs UI setup
@@ -1031,6 +1060,7 @@ test('filter accounts list', async ({ seededAccounts, page }) => {
 ## 3.5 Multi-Role Authentication
 
 ### Why?
+
 Test admin, viewer, regular user permissions independently.
 
 ### Implementation
@@ -1084,6 +1114,7 @@ projects: [
 ## 3.6 API-Based Login (Faster than UI)
 
 ### Why?
+
 UI login: ~5 seconds. API login: ~200ms. Multiply by 100 tests = saves 8 minutes.
 
 ### Implementation
@@ -1112,10 +1143,12 @@ setup('login via API', async ({ request }) => {
         './auth/login-state.json',
         JSON.stringify({
             cookies: [],
-            origins: [{
-                origin: process.env.QA_PLAYGROUND_URL!,
-                localStorage: [{ name: 'auth_token', value: token }],
-            }],
+            origins: [
+                {
+                    origin: process.env.QA_PLAYGROUND_URL!,
+                    localStorage: [{ name: 'auth_token', value: token }],
+                },
+            ],
         }),
     );
 });
@@ -1126,6 +1159,7 @@ setup('login via API', async ({ request }) => {
 ## 3.7 Visual Regression Testing
 
 ### Why?
+
 Catches unintended UI changes (color, layout, spacing).
 
 ### Implementation
@@ -1142,10 +1176,10 @@ test.describe('Dashboard visuals @visual', () => {
         await expect(page).toHaveScreenshot('dashboard.png', {
             fullPage: true,
             mask: [
-                page.getByTestId('current-time'),       // Dynamic timestamp
-                page.getByTestId('user-avatar'),        // User-specific
+                page.getByTestId('current-time'), // Dynamic timestamp
+                page.getByTestId('user-avatar'), // User-specific
             ],
-            maxDiffPixels: 100,                          // Tolerance
+            maxDiffPixels: 100, // Tolerance
             animations: 'disabled',
         });
     });
@@ -1158,16 +1192,19 @@ test.describe('Dashboard visuals @visual', () => {
 ```
 
 ### First run creates snapshots:
+
 ```bash
 npx playwright test --grep @visual --update-snapshots
 ```
 
 ### Subsequent runs compare:
+
 ```bash
 npx playwright test --grep @visual
 ```
 
 ### Best practices:
+
 - Use `mask:` for dynamic content (dates, avatars)
 - Set `maxDiffPixels` to allow font rendering differences
 - Disable animations
@@ -1179,6 +1216,7 @@ npx playwright test --grep @visual
 ## 3.8 Accessibility Testing (axe-core)
 
 ### Why?
+
 WCAG compliance is legally required in many jurisdictions (EU, US gov contracts).
 
 ### Implementation
@@ -1216,18 +1254,21 @@ test.describe('Accessibility @a11y', () => {
 ```
 
 ### With detailed reporting:
+
 ```typescript
 test('full a11y scan with report', async ({ page }) => {
     await page.goto('/');
     const results = await new AxeBuilder({ page }).analyze();
 
     if (results.violations.length > 0) {
-        console.table(results.violations.map(v => ({
-            id: v.id,
-            impact: v.impact,
-            nodes: v.nodes.length,
-            description: v.description,
-        })));
+        console.table(
+            results.violations.map((v) => ({
+                id: v.id,
+                impact: v.impact,
+                nodes: v.nodes.length,
+                description: v.description,
+            })),
+        );
     }
 
     expect(results.violations).toEqual([]);
@@ -1239,6 +1280,7 @@ test('full a11y scan with report', async ({ page }) => {
 ## 3.9 Network Mocking
 
 ### Why?
+
 - Test edge cases (500 errors, slow responses, empty arrays)
 - Decouple frontend tests from backend
 
@@ -1264,7 +1306,7 @@ test('shows error when API fails', async ({ loginPage, page }) => {
 test('shows loading state during slow API', async ({ loginPage, page }) => {
     // Delay response by 2 seconds
     await page.route('**/api/login', async (route) => {
-        await new Promise(r => setTimeout(r, 2000));
+        await new Promise((r) => setTimeout(r, 2000));
         await route.continue();
     });
 
@@ -1283,6 +1325,7 @@ test('handles empty accounts list', async ({ loggedInPage, page }) => {
 ```
 
 ### Request assertions:
+
 ```typescript
 test('correct payload sent to API', async ({ loginPage, page }) => {
     const requestPromise = page.waitForRequest('**/api/login');
@@ -1302,6 +1345,7 @@ test('correct payload sent to API', async ({ loginPage, page }) => {
 ## 3.10 Allure Reporting
 
 ### Why?
+
 - Rich HTML reports with history, trends, attachments
 - Industry standard for QA teams
 - Steps, screenshots, videos, traces all in one view
@@ -1332,6 +1376,7 @@ reporter: [
 ```
 
 ### Add Allure metadata to tests:
+
 ```typescript
 import { allure } from 'allure-playwright';
 
@@ -1341,8 +1386,8 @@ test('valid login @smoke', async ({ loginPage }) => {
     await allure.story('Valid credentials');
     await allure.severity('critical');
     await allure.owner('@team-auth');
-    await allure.tms('JIRA-1234');                        // Link to ticket
-    await allure.issue('GH-456', 'Bug if fails');         // Link to issue
+    await allure.tms('JIRA-1234'); // Link to ticket
+    await allure.issue('GH-456', 'Bug if fails'); // Link to issue
 
     await allure.step('attempt login', async () => {
         await loginPage.login(BANK_VALID_USER);
@@ -1353,6 +1398,7 @@ test('valid login @smoke', async ({ loginPage }) => {
 ```
 
 ### Generate report:
+
 ```bash
 npx allure generate allure-results --clean
 npx allure open
@@ -1363,6 +1409,7 @@ npx allure open
 ## 3.11 Husky + lint-staged
 
 ### Why?
+
 Catch issues at commit time, not in CI.
 
 ### Implementation
@@ -1379,13 +1426,8 @@ npx husky init
         "prepare": "husky"
     },
     "lint-staged": {
-        "*.ts": [
-            "eslint --fix",
-            "prettier --write"
-        ],
-        "*.{json,md,yml}": [
-            "prettier --write"
-        ]
+        "*.ts": ["eslint --fix", "prettier --write"],
+        "*.{json,md,yml}": ["prettier --write"]
     }
 }
 ```
@@ -1410,9 +1452,11 @@ npm install --save-dev @commitlint/cli @commitlint/config-conventional
 module.exports = {
     extends: ['@commitlint/config-conventional'],
     rules: {
-        'type-enum': [2, 'always', [
-            'feat', 'fix', 'docs', 'test', 'refactor', 'chore', 'ci', 'perf',
-        ]],
+        'type-enum': [
+            2,
+            'always',
+            ['feat', 'fix', 'docs', 'test', 'refactor', 'chore', 'ci', 'perf'],
+        ],
     },
 };
 ```
@@ -1422,7 +1466,9 @@ module.exports = {
 ## 3.12 eslint-plugin-playwright
 
 ### Why?
+
 Catches Playwright-specific bugs:
+
 - `await page.waitForTimeout()` (anti-pattern)
 - `test.only` left in code
 - Missing `await` on Playwright calls
@@ -1450,7 +1496,7 @@ export default [
             'playwright/no-focused-test': 'error',
             'playwright/no-wait-for-timeout': 'error',
             'playwright/no-conditional-in-test': 'warn',
-            'playwright/expect-expect': 'error',                // Catches no-assertion tests!
+            'playwright/expect-expect': 'error', // Catches no-assertion tests!
             'playwright/no-useless-not': 'warn',
             'playwright/prefer-web-first-assertions': 'error',
         },
@@ -1469,6 +1515,7 @@ This catches the `console.log` instead of `expect` problem **before commit**.
 ## 4.1 Test Sharding
 
 ### Why?
+
 Split 100 tests across 4 runners = 4x faster CI.
 
 ### Implementation
@@ -1531,6 +1578,7 @@ jobs:
 ## 4.2 Browser Caching in CI
 
 ### Why?
+
 Playwright browser download = ~150MB, ~30 seconds. Cache it.
 
 ### Implementation
@@ -1557,6 +1605,7 @@ Playwright browser download = ~150MB, ~30 seconds. Cache it.
 ```
 
 ### Cache node_modules:
+
 ```yaml
 - name: Cache node_modules
   uses: actions/cache@v4
@@ -1596,6 +1645,7 @@ steps:
 ## 4.4 Smoke Test Gate
 
 ### Why?
+
 Don't waste 1 hour running regression if smoke fails in 2 minutes.
 
 ### Implementation
@@ -1611,7 +1661,7 @@ jobs:
             - run: npx playwright test --grep @smoke --project=chromium
 
     regression:
-        needs: smoke               # ✅ Blocks if smoke fails
+        needs: smoke # ✅ Blocks if smoke fails
         runs-on: ubuntu-latest
         strategy:
             matrix:
@@ -1689,6 +1739,7 @@ playwright.config.ts        @qa-team @senior-engineers
 ```
 
 ### Branch protection (configure in GitHub Settings):
+
 - Require PR review (1 approver)
 - Require CODEOWNERS review
 - Require status checks: `smoke`, `lint`, `type-check`
@@ -1738,6 +1789,7 @@ updates:
 ## 4.8 Dockerfile
 
 ### Why?
+
 - "Works on my machine" → "works everywhere"
 - CI and local use the same image
 - Includes all system dependencies
@@ -1779,6 +1831,7 @@ services:
 ```
 
 ### Usage:
+
 ```bash
 docker compose up tests
 # OR
@@ -1814,12 +1867,13 @@ docker run --rm -v $(pwd)/playwright-report:/app/playwright-report playwright-fr
 - A11y specs: `<feature>.a11y.spec.ts`
 - Page objects: `<PageName>Page.ts` (PascalCase)
 - Test names: descriptive sentence, present tense
-  - ✅ "valid login redirects to dashboard"
-  - ❌ "Test login 1"
+    - ✅ "valid login redirects to dashboard"
+    - ❌ "Test login 1"
 
 ## Locator Strategy
 
 Priority order:
+
 1. `page.getByRole(...)` — accessibility first
 2. `page.getByLabel(...)` — form inputs
 3. `page.getByText(...)` — non-interactive
@@ -1863,27 +1917,32 @@ Priority order:
 ## Choices Justified
 
 ### Why Page Object Model?
+
 - Separates test intent from page mechanics
 - Locator changes localized to one file
 - Industry standard, easy onboarding
 
 ### Why Fixtures over beforeEach?
+
 - Dependency injection (test gets what it needs)
 - Composable (loggedInPage = dashboard + accounts + transactions)
 - Type-safe
 - Auto-cleanup via use() pattern
 
 ### Why storageState?
+
 - 100 tests × 5s UI login = 8 minutes
 - 100 tests × 0s (cached cookies) = 0 minutes
 - Login tested once in setup project
 
 ### Why both Jenkins & GitHub Actions?
+
 - Jenkins: internal corporate runner with private network access
 - GitHub Actions: PR-level fast feedback
 - (If reading this and only one is used — remove the other)
 
 ### Why testid > getByRole?
+
 - The QA Playground app doesn't have semantic labels
 - For real apps, prefer getByRole
 - ADR-003 has full reasoning
@@ -1895,28 +1954,35 @@ Priority order:
 
 ```markdown
 <!-- docs/adrs/ADR-001-page-object-model.md -->
+
 # ADR-001: Use Page Object Model
 
 ## Status
+
 Accepted — 2026-05-26
 
 ## Context
+
 Need a way to keep tests maintainable as the app grows.
 
 ## Decision
+
 Use Page Object Model with one class per logical page or significant component.
 
 ## Consequences
+
 - **Positive:** Locator changes localized; tests read like user stories
 - **Negative:** Some boilerplate; learning curve for new engineers
 - **Mitigation:** CONTRIBUTING.md documents the pattern
 
 ## Alternatives Considered
+
 1. **Functional helpers** — rejected due to lack of encapsulation
 2. **Screenplay pattern** — overkill for current team size
 ```
 
 Create one ADR per major decision:
+
 - ADR-001: Page Object Model
 - ADR-002: Locator pattern (readonly properties + arrow functions for dynamic)
 - ADR-003: testid-first selector strategy
@@ -1931,10 +1997,13 @@ Create one ADR per major decision:
 
 ```markdown
 <!-- .github/PULL_REQUEST_TEMPLATE.md -->
+
 ## Summary
+
 <!-- 1-3 sentences on what & why -->
 
 ## Type
+
 - [ ] New test
 - [ ] Test refactor
 - [ ] Framework feature
@@ -1943,6 +2012,7 @@ Create one ADR per major decision:
 - [ ] CI/CD
 
 ## Test Coverage
+
 - [ ] Added/updated tests
 - [ ] All existing tests pass
 - [ ] Smoke tests pass
@@ -1952,36 +2022,43 @@ Create one ADR per major decision:
 ## Screenshots (if UI-related)
 
 ## Linked Issues
+
 Fixes #
 ```
 
 ```markdown
-<!-- .github/ISSUE_TEMPLATE/flaky-test.md -->
----
+## <!-- .github/ISSUE_TEMPLATE/flaky-test.md -->
+
 name: Flaky Test
 about: Report an intermittently failing test
 labels: flaky-test
+
 ---
 
 ## Test
+
 **File:** `tests/...`
 **Test name:** ``
 
 ## Failure Rate
+
 Failed X out of last Y runs
 
 ## Failure Pattern
-- [ ] Browser-specific: ___
-- [ ] Time-of-day pattern: ___
-- [ ] Load-dependent: ___
-- [ ] Other: ___
+
+- [ ] Browser-specific: \_\_\_
+- [ ] Time-of-day pattern: \_\_\_
+- [ ] Load-dependent: \_\_\_
+- [ ] Other: \_\_\_
 
 ## Error Message
 ```
 
 ## Trace Link
+
 [Link to CI run]
-```
+
+````
 
 ---
 
@@ -2024,7 +2101,7 @@ If green → setup complete.
 - Slack: #qa-automation
 - Docs: this folder
 - Pair with: your onboarding buddy
-```
+````
 
 ---
 
@@ -2035,6 +2112,7 @@ If green → setup complete.
 ## 6.1 Test Impact Analysis
 
 ### Why?
+
 Don't run all 500 tests on every PR — run only tests affected by changes.
 
 ### Implementation (manual mapping):
@@ -2051,13 +2129,13 @@ const changedFiles = execSync('git diff --name-only origin/main')
 const impactMap: Record<string, string[]> = {
     'pages/qaplayground/LoginPage': ['tests/bank/login.spec.ts'],
     'pages/qaplayground/DashboardPage': ['tests/bank/dashboard.spec.ts'],
-    'fixtures/test-fixtures.ts': ['tests/**'],     // All tests
+    'fixtures/test-fixtures.ts': ['tests/**'], // All tests
 };
 
 const testsToRun = new Set<string>();
 for (const file of changedFiles) {
     for (const [pattern, tests] of Object.entries(impactMap)) {
-        if (file.includes(pattern)) tests.forEach(t => testsToRun.add(t));
+        if (file.includes(pattern)) tests.forEach((t) => testsToRun.add(t));
     }
 }
 
@@ -2098,8 +2176,8 @@ test.describe('Quarantined flaky tests @flaky', () => {
 
 ```yaml
 # Exclude from main suite, run separately
-- run: npx playwright test --grep-invert @flaky    # Main suite
-- run: npx playwright test --grep @flaky           # Flaky suite (don't block PR)
+- run: npx playwright test --grep-invert @flaky # Main suite
+- run: npx playwright test --grep @flaky # Flaky suite (don't block PR)
 ```
 
 ---
@@ -2142,6 +2220,7 @@ test('dashboard meets performance budget @perf', async ({ page }) => {
 ## 6.4 Email Testing (Mailosaur)
 
 ### Why?
+
 Test password resets, email verification, signup flows.
 
 ### Implementation
@@ -2211,23 +2290,29 @@ class SlackReporter implements Reporter {
     }
 
     async onEnd(result: FullResult): Promise<void> {
-        const passed = this.results.filter(r => r.status === 'passed').length;
-        const failed = this.results.filter(r => r.status === 'failed').length;
-        const flaky = this.results.filter(r => r.status === 'passed' && r.retry > 0).length;
+        const passed = this.results.filter((r) => r.status === 'passed').length;
+        const failed = this.results.filter((r) => r.status === 'failed').length;
+        const flaky = this.results.filter((r) => r.status === 'passed' && r.retry > 0).length;
 
         const color = failed > 0 ? '#ff0000' : '#36a64f';
 
         await axios.post(process.env.SLACK_WEBHOOK!, {
-            attachments: [{
-                color,
-                title: 'Playwright Test Run',
-                fields: [
-                    { title: 'Passed', value: passed, short: true },
-                    { title: 'Failed', value: failed, short: true },
-                    { title: 'Flaky', value: flaky, short: true },
-                    { title: 'Duration', value: `${(result.duration / 1000).toFixed(1)}s`, short: true },
-                ],
-            }],
+            attachments: [
+                {
+                    color,
+                    title: 'Playwright Test Run',
+                    fields: [
+                        { title: 'Passed', value: passed, short: true },
+                        { title: 'Failed', value: failed, short: true },
+                        { title: 'Flaky', value: flaky, short: true },
+                        {
+                            title: 'Duration',
+                            value: `${(result.duration / 1000).toFixed(1)}s`,
+                            short: true,
+                        },
+                    ],
+                },
+            ],
         });
     }
 }
@@ -2280,6 +2365,7 @@ npm run report:allure
 ```
 
 ### Health checks:
+
 - [ ] No `console.log` in test files
 - [ ] No `waitForTimeout` anywhere
 - [ ] No `test.only` in committed code
@@ -2303,15 +2389,15 @@ npm run report:allure
 
 # Effort Summary
 
-| Phase                            | Days     | Score Gain     |
-| -------------------------------- | -------- | -------------- |
-| 1 — Correctness                  | 2        | 6.5 → 8.0      |
-| 2 — Standards alignment          | 3        | 8.0 → 9.0      |
-| 3 — Enterprise capabilities      | 5        | 9.0 → 9.5      |
-| 4 — CI/CD excellence             | 2        | 9.5 → 9.8      |
-| 5 — Governance & docs            | 1        | 9.8 → 10.0     |
-| 6 — Advanced (ongoing)           | Ongoing  | Polish         |
-| **TOTAL**                        | **~13**  | **6.5 → 10.0** |
+| Phase                       | Days    | Score Gain     |
+| --------------------------- | ------- | -------------- |
+| 1 — Correctness             | 2       | 6.5 → 8.0      |
+| 2 — Standards alignment     | 3       | 8.0 → 9.0      |
+| 3 — Enterprise capabilities | 5       | 9.0 → 9.5      |
+| 4 — CI/CD excellence        | 2       | 9.5 → 9.8      |
+| 5 — Governance & docs       | 1       | 9.8 → 10.0     |
+| 6 — Advanced (ongoing)      | Ongoing | Polish         |
+| **TOTAL**                   | **~13** | **6.5 → 10.0** |
 
 ---
 
@@ -2330,6 +2416,6 @@ npm run report:allure
 
 ---
 
-*This is a living document. Update sections as you complete them — check off items in `README.md`'s checklist as you go.*
+_This is a living document. Update sections as you complete them — check off items in `README.md`'s checklist as you go._
 
-*Last updated: 2026-05-26*
+_Last updated: 2026-05-26_

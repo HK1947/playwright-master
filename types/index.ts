@@ -10,9 +10,18 @@ export interface BankAccount {
     accountName: string;
 }
 
+// Shape mirrors SecureBank's actual `bankTransactions` localStorage records
+// (verified against the running app — the previous 'credit' | 'debit' shape
+// did not match). Used by upcoming transaction specs (see README roadmap).
 export interface BankTransaction {
+    id: string;
+    transactionId: string;
     date: string;
-    description: string;
+    type: 'deposit' | 'withdrawal' | 'transfer';
+    accountId: string;
+    accountName: string;
     amount: number;
-    type: 'credit' | 'debit';
+    balanceAfter: number;
+    description: string;
+    status: 'completed' | 'pending' | 'failed';
 }

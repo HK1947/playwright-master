@@ -37,8 +37,12 @@ export class DashboardPage extends BasePage {
     }
 
     async logout(confirm: boolean = true): Promise<void> {
-        this.page.once('dialog', async dialog => {
-            confirm ? await dialog.accept() : await dialog.dismiss();
+        this.page.once('dialog', async (dialog) => {
+            if (confirm) {
+                await dialog.accept();
+            } else {
+                await dialog.dismiss();
+            }
         });
         await this.logoutButton.click();
     }
