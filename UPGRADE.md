@@ -2,9 +2,45 @@
 
 **Companion to:** `README.md` (audit summary)
 **Author:** Harsha Kumar K S
-**Last Updated:** 2026-05-26
+**Last Updated:** 2026-05-30
 **Current Score:** 6.5/10 → **Target:** 10/10
 **Estimated Effort:** ~3 weeks (13 engineer days)
+
+---
+
+## ⚠️ Correction: Authentication & `storageState`
+
+> **This note overrides every `storageState`-based auth example below.**
+>
+> Several sections in this guide (1.3, 2.3, 3.5, 3.6) were written assuming a
+> `setup` project saves a session with `storageState` and the browser projects
+> reuse it ("login once"). **That approach does not work for SecureBank.**
+>
+> SecureBank stores its auth token (`currentUser`) in **`sessionStorage`**, and
+> Playwright's `storageState` persists only **cookies + localStorage — never
+> `sessionStorage`**. A saved state therefore cannot re-authenticate.
+>
+> **What the framework actually does now:** there is no `setup` project and no
+> `auth/auth.setup.ts` (deleted). Tests that need a session log in **per-test**
+> via the `loggedInPage` fixture (`fixtures/test-fixtures.ts`).
+>
+> **To implement "login once" properly** (the real version of 2.3/3.5/3.6),
+> capture `sessionStorage` in a setup step and re-inject it before navigation:
+>
+> ```typescript
+> // setup: save sessionStorage alongside any storageState
+> const session = await page.evaluate(() => JSON.stringify(sessionStorage));
+> fs.writeFileSync('auth/session.json', session);
+>
+> // fixture: restore it before the app's scripts run
+> await page.addInitScript((s) => {
+>     for (const [k, v] of Object.entries(JSON.parse(s))) {
+>         sessionStorage.setItem(k, v as string);
+>     }
+> }, fs.readFileSync('auth/session.json', 'utf-8'));
+> ```
+>
+> Read the auth sections below with this substitution in mind.
 
 ---
 
@@ -229,32 +265,21 @@ npx playwright test --headed
 
 ## 1.3 Remove Hardcoded URLs
 
-### Problem
+> **✅ Resolved.** This originally flagged a hardcoded URL in `auth/auth.setup.ts`.
+> That file has since been **deleted** (see the Correction note above — its
+> `storageState` approach didn't work for this app). All navigation now goes
+> through `BasePage.navigate()` / page `goTo()` methods that rely on `baseURL`,
+> so there are no hardcoded URLs left. Kept here for audit traceability.
 
-`auth/auth.setup.ts:10` has hardcoded `https://qaplayground.com/bank` — breaks multi-env.
-
-### Implementation
-
-```typescript
-// auth/auth.setup.ts
-import { test as setup } from '@playwright/test';
-
-setup('login and save state', async ({ page }) => {
-    await page.goto('/bank'); // ✅ Uses baseURL from config
-
-    await page.getByTestId('username-input').fill(process.env.BANK_USERNAME!);
-    await page.getByTestId('password-input').fill(process.env.BANK_PASSWORD!);
-    await page.getByTestId('login-button').click();
-
-    await page.getByRole('heading', { name: /SecureBank/ }).waitFor();
-    await page.context().storageState({ path: './auth/login-state.json' });
-});
-```
+### Principle (still applies everywhere)
 
 ```typescript
+// ✅ pages use relative paths against the configured baseURL
+await this.navigate('/bank'); // resolves against QA_PLAYGROUND_URL
+
 // playwright.config.ts
 use: {
-    baseURL: process.env.QA_PLAYGROUND_URL,  // ✅ Already set
+    baseURL: process.env.QA_PLAYGROUND_URL, // ✅ already set
 }
 ```
 
@@ -277,7 +302,10 @@ ENV=staging npx playwright test
 
 ### Problem
 
-`jenkinsFile:128-131` references `results/junit-results.xml` but no JUnit reporter exists.
+> **✅ Resolved.** The `Jenkinsfile` references `results/junit-results.xml`, and
+> the JUnit reporter is now configured in `playwright.config.ts`. Kept for
+> reference. (Note: the pipeline file is `Jenkinsfile` — the earlier lowercase
+> `jenkinsFile` was renamed, since Jenkins requires the exact casing.)
 
 ### Implementation
 
@@ -476,6 +504,14 @@ test.describe('Login', { tag: '@regression' }, () => {
 ---
 
 ## 2.3 Multi-Browser Project Matrix
+
+> **⚠️ See the Correction note at the top.** The `setup` project + per-project
+> `storageState` shown below will **not** authenticate this app (auth lives in
+> `sessionStorage`). The current config has no `setup` project; auth is handled
+> per-test by the `loggedInPage` fixture. The matrix structure below is still a
+> valid reference for adding `webkit` / mobile / special projects — just drop the
+> `setup` dependency and `storageState` lines (or implement the sessionStorage
+> injection from the Correction note).
 
 ### Implementation
 
@@ -1063,6 +1099,12 @@ test('filter accounts list', async ({ seededAccounts, page }) => {
 
 Test admin, viewer, regular user permissions independently.
 
+> **⚠️ See the Correction note at the top.** Saving `./auth/${role}-state.json`
+> via `storageState` will not capture SecureBank's `sessionStorage` auth. To make
+> per-role sessions work, also save each role's `sessionStorage` (e.g.
+> `auth/${role}-session.json`) and re-inject it with `addInitScript` in a
+> role-aware fixture. The structure below is otherwise the right shape.
+
 ### Implementation
 
 ```typescript
@@ -1116,6 +1158,12 @@ projects: [
 ### Why?
 
 UI login: ~5 seconds. API login: ~200ms. Multiply by 100 tests = saves 8 minutes.
+
+> **⚠️ See the Correction note at the top.** The example writes the token into
+> `localStorage`, but SecureBank reads auth from **`sessionStorage`** (and this
+> demo has no real login API). For a token-in-sessionStorage app, inject the
+> token with `addInitScript` setting `sessionStorage`, not by writing a
+> `storageState` file. Treat this section as a generic pattern, not a drop-in.
 
 ### Implementation
 
