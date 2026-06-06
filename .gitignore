@@ -13,7 +13,11 @@ node_modules/
 # Environment secrets
 .env
 .env.*
-
+# Logs — regenerated each run
+logs/
+# Allure
+allure-results/
+allure-report/
 # Test artifacts — regenerated each run
 playwright-report/
 test-results/

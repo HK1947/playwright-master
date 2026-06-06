@@ -40,7 +40,7 @@ test.describe('Bank Login', () => {
 
         await expect(dashboardPage.dashboardHeading).toBeVisible();
         await expect(dashboardPage.quickAddButton).toBeVisible();
-        await expect(dashboardPage.logoutButton).toBeVisible();
+        await expect(dashboardPage.navBar.logoutButton).toBeVisible();
     });
 
     test('add savings account from dashboard @regression', async ({ loginPage, dashboardPage }) => {

@@ -1,97 +1,306 @@
-# .github/workflows/playwright.yml
-
-# NAME — shown in GitHub Actions tab
 name: Playwright Tests
 
-# WHEN to run this workflow
-# Lesson: "trigger" = what event starts the pipeline
 on:
-    # Run when code is pushed to main branch
-    push:
-        branches: [main, master]
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      browser:
+        description: 'Browser to test'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - chromium
+          - firefox
+          - webkit
 
-    # Run when Pull Request is created against main
-    pull_request:
-        branches: [main, master]
+env:
+  CI: true
+  NODE_VERSION: 20
 
-    # Allow manual trigger from GitHub UI
-    workflow_dispatch:
-
-# WHAT to run
 jobs:
-    test:
-        # WHICH machine to run on
-        # ubuntu-latest = free Linux machine provided by GitHub
-        runs-on: ubuntu-latest
+  # LINT & TYPE CHECK — Fast feedback gate
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-        # Timeout — kill job if it takes too long
-        timeout-minutes: 30
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-        # STEPS — commands that run in order
-        steps:
-            # Step 1: Download your code from GitHub
-            # Like: git clone your-repo
-            - name: Checkout code
-              uses: actions/checkout@v4
+      - name: Install dependencies
+        run: npm ci
 
-            # Step 2: Install Node.js
-            # Like: installing JDK on CI machine
-            - name: Setup Node.js
-              uses: actions/setup-node@v4
-              with:
-                  node-version: 20
+      - name: Run ESLint
+        run: npm run lint
 
-            # Step 3: Install dependencies from package.json
-            # npm ci = clean install (faster + stricter than npm install)
-            - name: Install dependencies
-              run: npm ci
+      - name: Run TypeScript check
+        run: npx tsc --noEmit
 
-            # Step 4: Install Playwright browsers
-            # Downloads Chromium, Firefox, WebKit
-            - name: Install Playwright browsers
-              run: npx playwright install --with-deps
+  # SMOKE GATE — Fast critical path check
+  smoke:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-            # Step 5: Create .env.qa file with secrets
-            # Secrets stored in GitHub Settings → Secrets
-            # NOT in code — never commit passwords
-            - name: Create environment file
-              run: |
-                  echo "QA_PLAYGROUND_URL=${{ secrets.QA_PLAYGROUND_URL }}" >> .env.qa
-                  echo "BANK_USERNAME=${{ secrets.BANK_USERNAME }}" >> .env.qa
-                  echo "BANK_PASSWORD=${{ secrets.BANK_PASSWORD }}" >> .env.qa
-                  echo "API_BASE_URL=${{ secrets.API_BASE_URL }}" >> .env.qa
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
 
-            # Step 6: Run lint check
-            - name: Run ESLint
-              run: npm run lint
+      - name: Install dependencies
+        run: npm ci
 
-            # Step 7: Run Playwright tests
-            - name: Run Playwright tests
-              run: npx playwright test
-              env:
-                  CI: true
-                  # CI=true triggers:
-                  # - retries: 1 (from our config)
-                  # - workers: 1 (from our config)
-                  # - forbidOnly: true (from our config)
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
-            # Step 8: Upload test report as artifact
-            # Even if tests fail — always upload report for debugging
-            - name: Upload HTML Report
-              uses: actions/upload-artifact@v4
-              if: always()
-              # if: always() = upload even when tests FAIL
-              with:
-                  name: playwright-report
-                  path: playwright-report/
-                  retention-days: 14
-                  # Keep report for 14 days then auto-delete
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
 
-            # Step 9: Upload test results (screenshots, videos, traces)
-            - name: Upload Test Results
-              uses: actions/upload-artifact@v4
-              if: always()
-              with:
-                  name: test-results
-                  path: test-results/
-                  retention-days: 14
+      - name: Install system deps
+        run: npx playwright install-deps chromium
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+
+      - name: Create env file
+        run: |
+          cat << EOF > .env.qa
+          QA_PLAYGROUND_URL=${{ secrets.QA_PLAYGROUND_URL }}
+          BANK_USERNAME=${{ secrets.BANK_USERNAME }}
+          BANK_PASSWORD=${{ secrets.BANK_PASSWORD }}
+          API_BASE_URL=${{ secrets.API_BASE_URL }}
+          REQRES_API_KEY=${{ secrets.REQRES_API_KEY }}
+          EOF
+
+      - name: Run smoke tests
+        run: npx playwright test --grep @smoke --project=chromium
+
+      - name: Upload smoke report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: smoke-report
+          path: playwright-report/
+          retention-days: 7
+
+  # API TESTS — Fast, no browser needed
+  api-tests:
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create env file
+        run: |
+          cat << EOF > .env.qa
+          QA_PLAYGROUND_URL=${{ secrets.QA_PLAYGROUND_URL }}
+          API_BASE_URL=${{ secrets.API_BASE_URL }}
+          REQRES_API_KEY=${{ secrets.REQRES_API_KEY }}
+          EOF
+
+      - name: Run API tests
+        run: npx playwright test --project=api
+
+      - name: Upload API report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: api-report
+          path: playwright-report/
+          retention-days: 7
+
+  # FULL REGRESSION — Cross-browser matrix with sharding
+  regression:
+    needs: [smoke, api-tests]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1/2, 2/2]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps ${{ matrix.browser }}
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+
+      - name: Install system deps
+        run: npx playwright install-deps ${{ matrix.browser }}
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+
+      - name: Create env file
+        run: |
+          cat << EOF > .env.qa
+          QA_PLAYGROUND_URL=${{ secrets.QA_PLAYGROUND_URL }}
+          BANK_USERNAME=${{ secrets.BANK_USERNAME }}
+          BANK_PASSWORD=${{ secrets.BANK_PASSWORD }}
+          API_BASE_URL=${{ secrets.API_BASE_URL }}
+          REQRES_API_KEY=${{ secrets.REQRES_API_KEY }}
+          EOF
+
+      - name: Run regression tests
+        run: npx playwright test --project=${{ matrix.browser }} --shard ${{ matrix.shard }}
+
+      - name: Upload shard report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report-${{ matrix.browser }}-${{ strategy.job-index }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: results-${{ matrix.browser }}-${{ strategy.job-index }}
+          path: test-results/
+          retention-days: 14
+
+  # MERGE REPORTS — Combine all shard reports
+  merge-reports:
+    needs: regression
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          path: all-reports
+          pattern: report-*
+
+      - name: Merge reports
+        run: npx playwright merge-reports --reporter html ./all-reports
+
+      - name: Upload merged report
+        uses: actions/upload-artifact@v4
+        with:
+          name: merged-playwright-report
+          path: playwright-report/
+          retention-days: 30
+
+  # NOTIFY — Send results to Slack
+  notify:
+    needs: [smoke, api-tests, regression]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Determine status
+        id: status
+        run: |
+          if [[ "${{ needs.smoke.result }}" == "failure" ]] || \
+             [[ "${{ needs.api-tests.result }}" == "failure" ]] || \
+             [[ "${{ needs.regression.result }}" == "failure" ]]; then
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "emoji=❌" >> $GITHUB_OUTPUT
+            echo "color=danger" >> $GITHUB_OUTPUT
+          else
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "emoji=✅" >> $GITHUB_OUTPUT
+            echo "color=good" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.26.0
+        with:
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "${{ steps.status.outputs.color }}",
+                  "blocks": [
+                    {
+                      "type": "header",
+                      "text": {
+                        "type": "plain_text",
+                        "text": "${{ steps.status.outputs.emoji }} Playwright Tests - ${{ steps.status.outputs.status }}"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        { "type": "mrkdwn", "text": "*Repository:*\n${{ github.repository }}" },
+                        { "type": "mrkdwn", "text": "*Branch:*\n${{ github.ref_name }}" },
+                        { "type": "mrkdwn", "text": "*Smoke:*\n${{ needs.smoke.result }}" },
+                        { "type": "mrkdwn", "text": "*API:*\n${{ needs.api-tests.result }}" },
+                        { "type": "mrkdwn", "text": "*Regression:*\n${{ needs.regression.result }}" },
+                        { "type": "mrkdwn", "text": "*Triggered by:*\n${{ github.actor }}" }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": { "type": "plain_text", "text": "View Run" },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK

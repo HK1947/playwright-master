@@ -11,6 +11,8 @@ export class LoginPage extends BasePage {
     readonly passwordField: Locator;
     readonly loginButton: Locator;
     readonly errorMessage: Locator;
+    readonly usernameError: Locator;
+    readonly passwordError: Locator;
     readonly pageHeading: Locator;
 
     constructor(page: Page) {
@@ -20,6 +22,8 @@ export class LoginPage extends BasePage {
         this.passwordField = page.getByTestId('password-input');
         this.loginButton = page.getByTestId('login-button');
         this.errorMessage = page.getByTestId('login-alert');
+        this.usernameError = page.getByText('Username is required');
+        this.passwordError = page.getByText('Password is required');
         this.pageHeading = page.getByRole('heading').first();
     }
 

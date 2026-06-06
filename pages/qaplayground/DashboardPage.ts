@@ -2,27 +2,26 @@
 import { Page, Locator } from '@playwright/test';
 import { BasePage } from '../BasePage';
 import { BankAccount } from '../../types';
+import { NavBar } from '../components/NavBar';
 
 export class DashboardPage extends BasePage {
-    // Navigation locators
-    readonly accountsNav: Locator;
-    readonly logoutButton: Locator;
+    // COMPOSITION — DashboardPage HAS a NavBar (not IS a NavBar)
+    readonly navBar: NavBar;
 
-    // Add account form locators
+    // Dashboard-specific locators
     readonly quickAddButton: Locator;
     readonly accountNameInput: Locator;
     readonly accountTypeSelect: Locator;
     readonly initialBalanceInput: Locator;
     readonly overdraftCheckbox: Locator;
     readonly saveAccountButton: Locator;
-
-    // Dashboard content
     readonly dashboardHeading: Locator;
 
     constructor(page: Page) {
         super(page);
-        this.accountsNav = page.getByTestId('nav-accounts');
-        this.logoutButton = page.getByTestId('logout-button');
+        // NavBar composed into DashboardPage
+        this.navBar = new NavBar(page);
+
         this.quickAddButton = page.getByTestId('quick-add-account');
         this.accountNameInput = page.getByTestId('account-name-input');
         this.accountTypeSelect = page.getByTestId('account-type-select');
@@ -32,27 +31,23 @@ export class DashboardPage extends BasePage {
         this.dashboardHeading = page.getByRole('heading').first();
     }
 
+    // Navigation now goes THROUGH navBar
     async goToAccounts(): Promise<void> {
-        await this.accountsNav.click();
+        await this.navBar.goToAccounts();
     }
 
     async logout(confirm: boolean = true): Promise<void> {
-        this.page.once('dialog', async (dialog) => {
-            if (confirm) {
-                await dialog.accept();
-            } else {
-                await dialog.dismiss();
-            }
-        });
-        await this.logoutButton.click();
+        await this.navBar.logout(confirm);
     }
 
-    // Facade pattern — 6 steps behind 1 method
     async addAccount(accountDetails: BankAccount): Promise<void> {
         await this.quickAddButton.click();
         await this.accountNameInput.fill(accountDetails.accountName);
         await this.accountTypeSelect.click();
-        await this.page.getByRole('option', { name: accountDetails.accountType }).click();
+        await this.page
+            .getByRole('listbox')
+            .getByRole('option', { name: accountDetails.accountType })
+            .click();
         await this.initialBalanceInput.fill(accountDetails.balance.toString());
         if (accountDetails.enableOverdraft) {
             await this.overdraftCheckbox.check();
