@@ -2,7 +2,7 @@
 
 [![Playwright](https://img.shields.io/badge/Playwright-1.60+-45ba63)](https://playwright.dev/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)](https://www.typescriptlang.org/)
-[![Node.js](https://img.shields.io/badge/Node.js-20-339933)](https://nodejs.org/)
+[![Node.js](https://img.shields.io/badge/Node.js-22-339933)](https://nodejs.org/)
 [![ESLint](https://img.shields.io/badge/ESLint-flat%20config-4B32C3)](https://eslint.org/)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions%20%2B%20Jenkins-2088FF)](https://github.com/features/actions)
 
